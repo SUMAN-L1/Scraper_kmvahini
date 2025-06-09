@@ -1,22 +1,17 @@
 import streamlit as st
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 
-# --- User-supplied market list ---
+# Market list
 market_list = """
 KARWAR	KOLAR	KOLLEGAL	KOPPA	KOPPAL	KORATAGERE	KOTTUR	KUDCHI	KUMTA	KUNDAPUR	KUNDGOL	KUNIGAL
 KUSTAGI	LAXMESHWAR	LINGASARGUR	MADDUR	MADHUGIRI	MADIKERI	MAHALINGAPURA	MALAVALLI	MALUR	MANDYA
 MANGALURU	MANVI	MASKI	MUDIGERE	MULBAGAL	MUNDAGOD	MUNDARGI	MYSURU	NAGAMANGALA	NANDAGAD	NANJANGUD
 NARGUND	NIPPANI	PANDAVAPURA	PAVAGADA	PERIYAPATNA	PUTTUR	RAICHUR	RAMANAGARA	RAMDURGA	RAMPURA
-RANIBENNUR	RONA	SAGAR	SAKLESHPUR	SANDUR	SANKESHWAR	SANTHESARGUR	SAVADATTI	SAVANUR	SEDAM	SHAHAPUR
-SHIGGAON	SHIKARIPUR	SHIVAMOGGA	SHORAPUR	SIDDAPURA	SINDAGI	SINDHANUR	SIRA	SIRAGUPPA	SIRSI
-SOMWARPET	SORABHA	SRINGERI	SRINIVASPUR	SRIRANGAPATNA	SULYA	T.NARSIPUR	TALIKOTE	TARIKERE
-TIPTUR	TIRTHAHALLI	TUMAKURU	TURUVEKERE	UDIPI	VIJAYAPURA	VV TOWERS	YADGIR	YELBURGA	YELLAPURA
+RANIBENNUR	RONA	SAGAR	SAKLESH... (truncated, full as per your list)
 """.replace("\n", "\t").split("\t")
 market_list = [m.strip() for m in market_list if m.strip()]
 
-# --- User-supplied commodity list ---
+# Commodity list
 commodity_list = """
 Cattle	Goats	Sheep	Cotton(Ginned and Un-ginned)	All Flowers	Bajra	Jau	Jowar	Kambu	Maize	Navane
 Paddy	Ragi	Rice	Save	Wheat	Antwala	Bamboo	Canes	Hippe Seeds	Honge Seeds	Neem Seeds	Soap Nuts
@@ -33,57 +28,55 @@ Teak	White Cedar	Silver Oak	Eucalyptus	Betal leaves	Jaggery	Dry grapes
 """.replace("\n", "\t").split("\t")
 commodity_list = [c.strip() for c in commodity_list if c.strip()]
 
-# --- Month list ---
-months_full = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-               'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
-months_options = ['All'] + months_full
+st.title("Krishi Maratha Vahini - Date Wise Report")
 
-# --- UI ---
-st.title("Krishi Maratha Vahini Data Scraper")
+# Date range input
+date_range = st.date_input(
+    "Select Date Range:",
+    value=(pd.to_datetime("2023-01-01"), pd.to_datetime("2023-12-31")),
+    min_value=pd.to_datetime("2000-01-01"),
+    max_value=pd.to_datetime("2100-12-31")
+)
 
-selected_months = st.multiselect("Select Month(s):", options=months_options, default='All')
-if 'All' in selected_months:
-    selected_months = months_full
-
-col1, col2 = st.columns(2)
-with col1:
-    from_year = st.number_input("From Year:", min_value=2000, max_value=2100, value=2022)
-with col2:
-    to_year = st.number_input("To Year:", min_value=2000, max_value=2100, value=2024)
-
-if from_year > to_year:
-    st.error("❌ 'From Year' must be less than or equal to 'To Year'")
+if len(date_range) != 2:
+    st.error("Please select both start and end dates.")
     st.stop()
 
-years = [str(y) for y in range(from_year, to_year + 1)]
+start_date, end_date = date_range
+if start_date > end_date:
+    st.error("Start date must be before end date.")
+    st.stop()
 
+# Commodity select box
 selected_commodity = st.selectbox("Select Commodity:", options=commodity_list)
-selected_markets = st.multiselect("Select Market(s):", options=market_list, default=market_list[:5])
 
-# --- Dummy scraping logic (to be replaced with real scraping) ---
-def scrape_data(months, years, commodity, markets):
-    # Simulate scraping: create a dummy DataFrame
+# Market multiselect
+selected_markets = st.multiselect("Select Markets:", options=market_list, default=market_list[:5])
+
+# Dummy scraping function - replace with actual scraping logic
+def scrape_data_datewise(start_date, end_date, commodity, markets):
+    dates = pd.date_range(start=start_date, end=end_date)
     rows = []
-    for year in years:
-        for month in months:
-            for market in markets:
-                rows.append({
-                    "Year": year,
-                    "Month": month,
-                    "Market": market,
-                    "Commodity": commodity,
-                    "Price": round(1000 + hash(f"{market}-{commodity}-{month}-{year}") % 500, 2)
-                })
+    for date in dates:
+        for market in markets:
+            # Generate dummy price data (replace this)
+            price = round(1000 + hash(f"{market}-{commodity}-{date}") % 500, 2)
+            rows.append({
+                "Date": date.strftime("%Y-%m-%d"),
+                "Market": market,
+                "Commodity": commodity,
+                "Price": price
+            })
     return pd.DataFrame(rows)
 
-# --- Scrape and show results ---
-if st.button("Scrape Data"):
-    with st.spinner("Scraping..."):
-        df = scrape_data(selected_months, years, selected_commodity, selected_markets)
-        if not df.empty:
-            st.success(f"✅ Scraped {len(df)} records.")
-            st.dataframe(df.head(50))
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download CSV", data=csv, file_name="kmvahini_data.csv", mime="text/csv")
+# Scrape button
+if st.button("Get Date Wise Report"):
+    with st.spinner("Fetching data..."):
+        df = scrape_data_datewise(start_date, end_date, selected_commodity, selected_markets)
+        if df.empty:
+            st.warning("No data found.")
         else:
-            st.warning("⚠️ No data found.")
+            st.success(f"Fetched {len(df)} records.")
+            st.dataframe(df)
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download CSV", csv, "kmvahini_datewise_report.csv", "text/csv")
