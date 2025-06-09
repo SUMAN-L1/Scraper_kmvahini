@@ -1,0 +1,3 @@
+streamlit>=1.35.0
+pandas>=2.0.0
+kmvahini  # Ensure this is your custom package or installable via pip (if not, install it locally)
